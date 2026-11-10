@@ -21,6 +21,7 @@ services:
       ANOMALY_OUTBOUND: ${ANOMALY_OUTBOUND:-4}
     volumes:
       - ./nginx/templates/default.conf.template:/etc/nginx/templates/conf.d/default.conf.template:ro
+      - ./nginx/templates/logging.conf.template:/etc/nginx/templates/conf.d/logging.conf.template:ro
       - ./nginx/certs:/certs:ro
       - ./logs/nginx:/var/log/nginx
       - ./logs/modsecurity:/var/log/modsecurity
