@@ -1,0 +1,5 @@
+.env
+logs/*
+!logs/.gitkeep
+nginx/certs/*
+!nginx/certs/.gitkeep

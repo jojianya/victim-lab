@@ -1,0 +1,82 @@
+name: victim-lab
+
+services:
+  nginx-waf:
+    image: owasp/modsecurity-crs:nginx
+    container_name: nginx-waf
+    restart: unless-stopped
+    ports:
+      - "80:8080"
+      - "443:8443"
+    environment:
+      BACKEND: "http://dvwa"            # unused (custom template), required by image
+      MODSEC_RULE_ENGINE: ${MODSEC_RULE_ENGINE:-DetectionOnly}   # On | DetectionOnly | Off
+      MODSEC_AUDIT_ENGINE: ${MODSEC_AUDIT_ENGINE:-RelevantOnly}
+      MODSEC_AUDIT_LOG_FORMAT: JSON
+      MODSEC_AUDIT_LOG_TYPE: Serial
+      MODSEC_AUDIT_LOG: /var/log/modsecurity/audit.log
+      PARANOIA: ${PARANOIA:-1}
+      BLOCKING_PARANOIA: ${PARANOIA:-1}
+      ANOMALY_INBOUND: ${ANOMALY_INBOUND:-5}
+      ANOMALY_OUTBOUND: ${ANOMALY_OUTBOUND:-4}
+    volumes:
+      - ./nginx/templates/default.conf.template:/etc/nginx/templates/conf.d/default.conf.template:ro
+      - ./nginx/certs:/certs:ro
+      - ./logs/nginx:/var/log/nginx
+      - ./logs/modsecurity:/var/log/modsecurity
+    networks: [web]
+    depends_on: [dvwa, juice]
+    logging: &log
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  dvwa:
+    image: ghcr.io/digininja/dvwa:latest
+    container_name: dvwa
+    restart: unless-stopped
+    environment:
+      DB_SERVER: mysql
+      DB_DATABASE: dvwa
+      DB_USER: dvwa
+      DB_PASSWORD: ${MYSQL_PASSWORD:-p@ssw0rd}
+      DEFAULT_SECURITY_LEVEL: ${DVWA_SECURITY:-low}
+    networks: [web, db]        # internal only, no published ports
+    depends_on:
+      mysql: { condition: service_healthy }
+    logging: *log
+
+  juice:
+    image: bkimminich/juice-shop:latest
+    container_name: juice
+    restart: unless-stopped
+    networks: [web]            # internal only, uses built-in SQLite
+    logging: *log
+
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    restart: unless-stopped
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpass}
+      MYSQL_DATABASE: dvwa
+      MYSQL_USER: dvwa
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-p@ssw0rd}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks: [db]             # db network is internal: no outside access at all
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-rootpass}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    mem_limit: 512m
+    logging: *log
+
+networks:
+  web: {}
+  db:
+    internal: true
+
+volumes:
+  mysql_data:

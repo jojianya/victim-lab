@@ -1,0 +1,7 @@
+# Direct-to-app access (no WAF) for A/B comparison of attacks.
+# Use: docker compose -f docker-compose.yml -f docker-compose.bypass.yml up -d
+services:
+  dvwa:
+    ports: ["8081:80"]
+  juice:
+    ports: ["8082:3000"]
